@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/opentracing/opentracing-go"
-	
+
 	"github.com/RichardKnop/machinery/v2/backends/amqp"
 	"github.com/RichardKnop/machinery/v2/brokers/errs"
 	"github.com/RichardKnop/machinery/v2/log"
@@ -156,6 +156,11 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 		return err
 	}
 
+	//Defer run handler for the end of the task
+	if worker.postTaskHandler != nil {
+		defer worker.postTaskHandler(signature)
+	}
+
 	// try to extract trace span from headers and add it to the function context
 	// so it can be used inside the function if it has context.Context as the first
 	// argument. Start a new span if it isn't found.
@@ -171,11 +176,6 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 	//Run handler before the task is called
 	if worker.preTaskHandler != nil {
 		worker.preTaskHandler(signature)
-	}
-
-	//Defer run handler for the end of the task
-	if worker.postTaskHandler != nil {
-		defer worker.postTaskHandler(signature)
 	}
 
 	// Call the task
