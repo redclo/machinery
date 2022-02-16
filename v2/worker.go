@@ -30,6 +30,7 @@ type Worker struct {
 	preTaskHandler    func(*tasks.Signature)
 	postTaskHandler   func(*tasks.Signature)
 	preConsumeHandler func(*Worker) bool
+	OnProccHandler    func(*tasks.Signature)
 }
 
 var (
@@ -131,6 +132,11 @@ func (worker *Worker) Quit() {
 
 // Process handles received tasks and triggers success/error callbacks
 func (worker *Worker) Process(signature *tasks.Signature) error {
+	//Defer run handler for the end of the task
+	if worker.OnProccHandler != nil {
+		defer worker.OnProccHandler(signature)
+	}
+
 	// If the task is not registered with this worker, do not continue
 	// but only return nil as we do not want to restart the worker process
 	if !worker.server.IsTaskRegistered(signature.Name) {
@@ -140,11 +146,6 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 	taskFunc, err := worker.server.GetRegisteredTask(signature.Name)
 	if err != nil {
 		return nil
-	}
-
-	//Defer run handler for the end of the task
-	if worker.postTaskHandler != nil {
-		defer worker.postTaskHandler(signature)
 	}
 
 	// Update task state to RECEIVED
@@ -176,6 +177,11 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 	//Run handler before the task is called
 	if worker.preTaskHandler != nil {
 		worker.preTaskHandler(signature)
+	}
+
+	//Defer run handler for the end of the task
+	if worker.postTaskHandler != nil {
+		defer worker.postTaskHandler(signature)
 	}
 
 	// Call the task
@@ -418,6 +424,10 @@ func (worker *Worker) SetPreConsumeHandler(handler func(*Worker) bool) {
 //GetServer returns server
 func (worker *Worker) GetServer() *Server {
 	return worker.server
+}
+
+func (worker *Worker) SetOnProccHandler(handler func(*tasks.Signature)) {
+	worker.OnProccHandler = handler
 }
 
 //
