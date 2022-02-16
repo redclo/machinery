@@ -142,6 +142,11 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 		return nil
 	}
 
+	//Defer run handler for the end of the task
+	if worker.postTaskHandler != nil {
+		defer worker.postTaskHandler(signature)
+	}
+
 	// Update task state to RECEIVED
 	if err = worker.server.GetBackend().SetStateReceived(signature); err != nil {
 		return fmt.Errorf("Set state to 'received' for task %s returned error: %s", signature.UUID, err)
@@ -154,11 +159,6 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 	if err != nil {
 		worker.taskFailed(signature, err)
 		return err
-	}
-
-	//Defer run handler for the end of the task
-	if worker.postTaskHandler != nil {
-		defer worker.postTaskHandler(signature)
 	}
 
 	// try to extract trace span from headers and add it to the function context
